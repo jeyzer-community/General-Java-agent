@@ -19,13 +19,17 @@ Jeyzer Community is using this agent library in the [Jeyzer Recorder](https://je
 
 Jeyzer extensions include :
 
+- System property and environment variable resolution in agent variables 
+  Variable syntax is : ${system_property_or_environment_variable_name}
+  Resolution order is performed in this order : internal agent variable, system property, environment variable
+   Example : <variable name="jeyzer-agent-home">${JEYZER_AGENT_HOME}</variable>
 - Java 11 support
 - Bug fix : load Sun Apache Xerces schema validator first
 
 
 REQUIREMENTS
 ------------
-- Java 1.5 or later
+- Java 1.6 or later
 
 
 LICENSE

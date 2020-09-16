@@ -135,7 +135,14 @@ import org.xml.sax.SAXException;
  * 
  * The {@code /agent/variable} element <u>must have (only) {@code name} attribute</u> which is used
  * as a reference in other parts of the configuration file. The {@code name} reference is replaced
- * by the value of the {@code /agent/variable} element. The variable is referenced with the following
+ * by the value of the {@code /agent/variable} element. 
+ * The variable value can contain variable references which will be resolved in this order :
+ * <ul>
+ * 		<li>Variable defined previously</li>
+ * 		<li>System property</li>
+ * 		<li>Environment variable</li>
+ * </ul> 
+ * The variable is referenced with the following
  * pattern:
  * <blockquote>
  * 		${VARIABLE}
@@ -465,6 +472,8 @@ public class Agent
 	private static final String APACHE_XML_SCHEMA_FACTORY =
 			"org.apache.xerces.jaxp.validation.XMLSchemaFactory";
 	
+	public static final String VARIABLE_PREFIX = "${";
+	public static final String VARIABLE_SUFFIX = "}";
 	
 	/**
 	 * This method is called before the main method call right after the JVM initialisation. 
@@ -724,9 +733,11 @@ public class Agent
 			} while(matched);
 			
 			// Replace all variables in elements in the configuration file.
+			//  Exclude variable test fields that may reference system properties 
+			//   or system variables
 			NodeList allElements =
 				(NodeList)xpath.evaluate(
-					"/agent//*/text()",
+					"/agent//*[not(self::variable)]/text()",
 					configDocument,
 					XPathConstants.NODESET
 				);
@@ -864,10 +875,88 @@ public class Agent
 			Node variableValue = variableEntry.getFirstChild();
 			NamedNodeMap nameAttributes = variableEntry.getAttributes();
 			Node nameAttribute = nameAttributes.getNamedItem("name");
-			map.put(nameAttribute.getNodeValue(), ((Text)variableValue).getData());
+			String value = resolveValue(((Text)variableValue).getData(), map);
+			map.put(nameAttribute.getNodeValue(), value);
 		}
 	}
 	
+	
+	/**
+	 * Resolves the variables ${VARIABLE} if present, 
+	 * looking first for previous agent variable, second system property, third for environment variable.
+	 */
+	private static String resolveValue(String value, Map<String, String> map){
+		StringBuilder resolvedValue = new StringBuilder(10);
+		int end = 0;
+		int pos = 0;
+		int prev = 0;
+		
+		while(pos != -1){
+			pos = value.indexOf(VARIABLE_PREFIX, pos);
+			
+			if (pos != -1){
+				// get the beginning
+				resolvedValue.append(value.substring(prev, pos));
+								
+				end = value.indexOf(VARIABLE_SUFFIX, pos);
+				if (end == -1){
+					resolvedValue.append(value.substring(pos));
+					return resolvedValue.toString();
+				}
+				else{
+					resolvedValue.append(resolveVariable(value.substring(pos, end+1), map));
+				}
+				
+				prev = end +1;
+				end++;
+				pos = end;
+			}else {
+				// end reached
+				resolvedValue.append(value.substring(end, value.length()));
+			}
+			
+		}
+		
+		return resolvedValue.toString();
+	}
+	
+	/**
+	 * Resolves the variables ${VARIABLE} if present, 
+	 * looking first for previous agent variable, second system property, third for environment variable.
+	 */
+	private static String resolveVariable(String value, Map<String, String> map){
+
+		if (value !=null && value.startsWith(VARIABLE_PREFIX) && value.endsWith(VARIABLE_SUFFIX)){
+			String variable = value.substring(2, value.length()-1);
+			String resolvedValue;
+			
+			// exotic case, return ${}
+			if (variable.length()==0)
+				return value;
+
+			resolvedValue = map.get(variable);
+			if (resolvedValue != null)
+				return resolveInnerVariable(resolvedValue, value, map);
+			
+			resolvedValue = System.getProperty(variable);
+			if (resolvedValue != null)
+				return resolveInnerVariable(resolvedValue, value, map);
+			
+			resolvedValue = System.getenv(variable);
+			if (resolvedValue != null)
+				return resolveInnerVariable(resolvedValue, value, map);
+		}
+		
+		return value;
+	}
+	
+	private static String resolveInnerVariable(String resolvedValue, String originalValue, Map<String, String> map){
+		String result = resolvedValue;
+		if (resolvedValue.contains(VARIABLE_PREFIX)){
+			result = resolveValue(resolvedValue, map);
+		}
+		return result;
+	}
 	
 	/**
 	 * Creates an object according to the given configuration elements (i.e. /agent/configuration

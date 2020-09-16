@@ -17,6 +17,10 @@ already handled for the programmer.
 
 Jeyzer Community is using this agent library in the [Jeyzer Recorder](https://jeyzer.org/jeyzer-recorder/).
 
+Jeyzer extensions include :
+
+- Java 11 support
+
 
 REQUIREMENTS
 ------------

@@ -20,6 +20,7 @@ Jeyzer Community is using this agent library in the [Jeyzer Recorder](https://je
 Jeyzer extensions include :
 
 - Java 11 support
+- Bug fix : load Sun Apache Xerces schema validator first
 
 
 REQUIREMENTS

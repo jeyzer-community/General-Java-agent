@@ -456,8 +456,14 @@ import org.xml.sax.SAXException;
  */
 public class Agent
 {
-	private final static String PREMAIN_SIGNATURE =
+	private static final String PREMAIN_SIGNATURE =
 		"static void premain(java.util.regex.Pattern[], java.util.regex.Pattern[], Object, Instrumentation)";
+
+	private static final String SUN_XML_SCHEMA_FACTORY =
+			"com.sun.org.apache.xerces.internal.jaxp.validation.XMLSchemaFactory";
+
+	private static final String APACHE_XML_SCHEMA_FACTORY =
+			"org.apache.xerces.jaxp.validation.XMLSchemaFactory";
 	
 	
 	/**
@@ -621,12 +627,36 @@ public class Agent
 		ConfigElements retVal = null;
 		try {
 			// Validate configuration document.
+			boolean validate = true;
 			ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
 			SchemaFactory factory = SchemaFactory.newInstance(XMLConstants.W3C_XML_SCHEMA_NS_URI);
-			Source schemaFile =	new StreamSource(classLoader.getResourceAsStream("agent.xsd"));
-			Schema schema = factory.newSchema(schemaFile);
-			Validator validator = schema.newValidator();
-			validator.validate(new DOMSource(configDocument));
+			
+			// Force the Sun Apache Xerces implementation
+			try{
+				factory = SchemaFactory.newInstance(
+						XMLConstants.W3C_XML_SCHEMA_NS_URI, 
+						SUN_XML_SCHEMA_FACTORY,
+						Agent.class.getClassLoader()
+						);
+			}catch(IllegalArgumentException ex){
+				// if JVM is not Sun one
+				System.out.println("Sun Apache schema factory : " + SUN_XML_SCHEMA_FACTORY + " not found. Loading default one.");
+				factory = SchemaFactory.newInstance(XMLConstants.W3C_XML_SCHEMA_NS_URI);
+				System.out.println("Default JVM schema factory is : " + factory.getClass().getName());
+				
+				if (APACHE_XML_SCHEMA_FACTORY.equals(factory.getClass().getName()))
+					// if application comes with its own Apache Xerces library, validation fails with this error :  
+					//   org.xml.sax.SAXParseException; cvc-elt.1.a: Cannot find the declaration of element 'agent'.
+					// Disable therefore the validation
+					validate = false;
+			}
+			
+			if (validate){
+				Source schemaFile =	new StreamSource(classLoader.getResourceAsStream("agent.xsd"));
+				Schema schema = factory.newSchema(schemaFile);
+				Validator validator = schema.newValidator();
+				validator.validate(new DOMSource(configDocument));
+			}
 			
 			XPath xpath = XPathFactory.newInstance().newXPath();
 			

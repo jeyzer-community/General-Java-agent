@@ -15,6 +15,9 @@ for different agents. And yet one more advantage is that the programmer does not
 about the manifest attributes mentioned java.lang.instrument package description. They are
 already handled for the programmer.
 
+Jeyzer Community is using this agent library in the [Jeyzer Recorder](https://jeyzer.org/jeyzer-recorder/).
+
+
 REQUIREMENTS
 ------------
 - Java 1.5 or later
@@ -22,7 +25,7 @@ REQUIREMENTS
 
 LICENSE
 -------
-MIT License
+Hapi code is under MIT License
 
 Copyright (c) 2010 Hapi, http://www.hapiware.com
 
@@ -43,3 +46,9 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
+
+Jeyzer code extensions are under  MPL 2.0 License
+
+Copyright (c) 2020 Jeyzer, https://jeyzer.org
+
+Licensed under the [Mozilla Public License, Version 2.0](https://www.mozilla.org/media/MPL/2.0/index.815ca599c9df.txt)

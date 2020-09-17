@@ -9,6 +9,7 @@
 	<artifactId>jeyzer-agent</artifactId>
 	<version>3.0</version>
 	<name>Jeyzer Java Agent</name>
+	<url>https://github.com/jeyzer-community/jeyzer-agent</url>
 	<description>
 		Agent is a generic solution to greatly simplify the agent programming
 		(see java.lang.instrument package description for more information about agents in general).
@@ -54,6 +55,20 @@
 				</executions>
 			</plugin>
 			-->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-gpg-plugin</artifactId>
+				<version>1.5</version>
+				<executions>
+					<execution>
+						<id>sign-artifacts</id>
+						<phase>verify</phase>
+						<goals>
+							<goal>sign</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-jar-plugin</artifactId>
@@ -189,10 +204,10 @@
 	<inceptionYear>2020</inceptionYear>
 	
 	<scm>
-		<connection>scm:git:git://github.com/jeyzer-community/jeyzer-agent</connection>
-		<developerConnection>scm:git:git://github.com/jeyzer-community/jeyzer-agent</developerConnection>
-		<tag>HEAD</tag>
 		<url>https://github.com/jeyzer-community/jeyzer-agent</url>
+		<connection>scm:git:ssh://git@github.com/jeyzer-community/jeyzer-agent.git</connection>
+		<developerConnection>scm:git:ssh://git@github.com/jeyzer-community/jeyzer-agent.git</developerConnection>
+		<tag>HEAD</tag>
 	</scm>
 	
 </project>

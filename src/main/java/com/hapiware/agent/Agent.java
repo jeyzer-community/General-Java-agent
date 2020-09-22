@@ -59,16 +59,16 @@ import org.xml.sax.SAXException;
  * <h3>Using {@code Agent}</h3>
  * 
  * {@code Agent} is specified by using Java {@code -javaagent} switch like this:
- * <blockquote>
+ * <pre>
  *     {@code -javaagent:agent-jarpath=path-to-xml-config-file}
- * </blockquote>
+ * </pre>
  *
  * For example:
- * <blockquote>
+ * <pre>
  * 		{@code
  * 			-javaagent:/users/me/agent/target/agent-1.0.0.jar=/users/me/agent/agent-config.xml
  * 		}
- * </blockquote>
+ * </pre>
  * 
  * 
  * 
@@ -96,7 +96,7 @@ import org.xml.sax.SAXException;
  * </ul>
  * 
  * So, in general a configuration XML file looks like this:
- * <xmp>
+ * <pre>{@code
  * 	<?xml version="1.0" encoding="UTF-8" ?>
  *	<agent>
  *		<variable />
@@ -123,11 +123,9 @@ import org.xml.sax.SAXException;
  *			-->
  *		</configuration>
  *	</agent>
- * </xmp>
+ * }</pre>
  * 
- * 
- * 
- * <h4><a name="agent-variable-element">{@code /agent/variable} element</a></h4>
+ * <h4><a id="agent-variable-element">{@code /agent/variable} element</a></h4>
  * The {@code /agent/variable} element is <b>optional</b> and it is supposed to be used to simplify
  * the configuration file. Variables can be anywhere under {@code agent} element (i.e. they
  * need not to be in the beginning of the configuration file).
@@ -144,9 +142,9 @@ import org.xml.sax.SAXException;
  * </ul> 
  * The variable is referenced with the following
  * pattern:
- * <blockquote>
+ * <pre>
  * 		${VARIABLE}
- * </blockquote>
+ * </pre>
  * 
  * where:
  * <ul>
@@ -155,7 +153,8 @@ import org.xml.sax.SAXException;
  * 
  * Here is a simple example where every {@code ${repo-path}} variable reference is replaced with
  * {@code /users/me/.m2/repository} string:
- * <xmp>
+ * <pre>
+ * {@code
  * 	<?xml version="1.0" encoding="UTF-8" ?>
  *	<agent>
  *		<variable name="repo-path">/users/me/.m2/repository</variable>
@@ -169,12 +168,12 @@ import org.xml.sax.SAXException;
  *		</classpath>
  *		<configuration>...</configuration>
  *	</agent>
- * </xmp>
- * 
+ * }</pre>
  * 
  * Variables can be used more creatively if there is a need for that. This example produces exactly
  * the same result than the example above but the use of variables are more complex:
- * <xmp>
+ * <pre>
+ * {@code
  * 	<?xml version="1.0" encoding="UTF-8" ?>
  *	<agent>
  *		<variable name="a">repo</variable>
@@ -194,27 +193,23 @@ import org.xml.sax.SAXException;
  * 			<entry>${repo-path}/${asm-package}/asm-tree/${asm-version}/asm-tree-${asm-version}.jar</entry>
  *		</classpath>
  *		<configuration>...</configuration>
- *	</agent>
- * </xmp>
+ *	</agent>}
+ *</pre>
  * 
- * 
- * 
- * <h4><a name="agent-delegate-element">{@code /agent/delegate} element</a></h4>
+ * <h4><a id="agent-delegate-element">{@code /agent/delegate} element</a></h4>
  * The {@code /agent/delegate} element is <b>mandatory</b> and its value is the name of the delegate class
  * as a fully qualified name (e.g. {@code com.hapiware.asm.TimeMachineAgentDelegate}).
  * <p>
  * 
  * The agent delegate class must have the following method (with the exact signature):
- * <blockquote>
- * 	<pre>
+ * <pre>
  * 		public static void premain(
  * 			java.util.regex.Pattern[] includePatterns,
  * 			java.util.regex.Pattern[] excludePatterns,
  * 			Object config,
  * 			Instrumentation instrumentation
  * 		)
- * 	</pre>
- * </blockquote>
+ * </pre>
  * 
  * where:
  * <ul>
@@ -241,7 +236,7 @@ import org.xml.sax.SAXException;
  * 
  * 
  * 
- * <h4><a name="agent-classpath-element">{@code /agent/classpath} element</a></h4>
+ * <h4><a id="agent-classpath-element">{@code /agent/classpath} element</a></h4>
  * The {@code /agent/classpath} element is <b>mandatory</b> and is used to define the classpath
  * <b>for the agent <u>delegate</u> class</b>. This means that there is no need to put any of
  * the used libraries for the agent delegate class in to your environment classpath.
@@ -250,8 +245,8 @@ import org.xml.sax.SAXException;
  * but can have several. The only required classpath entry is the delegate agent (.jar file) itself.
  * However, usually there are other classpath entries for the libraries needed by the delegate
  * agent. Here is an example:
- * 
- * <xmp>
+ * <pre>
+ * {@code
  * 	<?xml version="1.0" encoding="UTF-8" ?>
  *	<agent>
  *		<delegate>com.hapiware.agent.TimeMachineAgentDelegate</delegate>
@@ -260,18 +255,17 @@ import org.xml.sax.SAXException;
  * 			<entry>/usr/local/asm-3.1/lib/all/all-asm-3.1.jar</entry>
  *		</classpath>
  *		<configuration>...</configuration>
- *	</agent>
- * </xmp>
+ *	</agent>}
+ * </pre>
  * 
- * 
- * 
- * <h4><a name="agent-filter-element">{@code /agent/filter} element</a></h4>
+ * <h4><a id="agent-filter-element">{@code /agent/filter} element</a></h4>
  * The {@code /agent/filter} is <b>optional</b> and is used to filter classes to be
  * instrumented.
  * <p>
  * The {@code /agent/filter} element can have several {@code include} and/or {@code exclude}
  * elements but can have also none of them. Here is an example:
- * <xmp>
+ * <pre>
+ * {@code
  * 	<?xml version="1.0" encoding="UTF-8" ?>
  * 	<agent>
  *		<delegate>com.hapiware.test.MyAgentDelegate</delegate>
@@ -284,8 +278,8 @@ import org.xml.sax.SAXException;
  * 			<exclude>^com/hapiware/.+/CreateCalculationForm</exclude>
  * 		</filter>
  * 		<configuration>...</configuration>
- * 	</agent>
- * </xmp>
+ * 	</agent>}
+ * </pre>
  * 
  * <h5>{@code <include>} element</h5>
  * {@code <include>} element can be used for matching the possible candidates for instrumentation.
@@ -307,7 +301,7 @@ import org.xml.sax.SAXException;
  * separated with slash (/) instead of period (.).
  * 
  * 
- * <h4><a name="agent-configuration-element">{@code /agent/configuration/} element</a></h4>
+ * <h4><a id="agent-configuration-element">{@code /agent/configuration/} element</a></h4>
  * The {@code /agent/configuration/} element is <b>optional</b> and has all the necessary
  * configuration information for the agent delegate class. The exact structure can depend on
  * the programmer but there are some predefined structures as well. The configuration object
@@ -330,15 +324,16 @@ import org.xml.sax.SAXException;
  * delivered to the agent delegate's
  * {@code static void premain(java.util.regex.Pattern[], java.util.regex.Pattern[], Object, Instrumentation)}
  * method as an {@link Object} argument. For example:
- * <xmp>
+ * <pre>
+ * {@code
  * 	<?xml version="1.0" encoding="UTF-8" ?>
  *	<agent>
  *		<delegate>com.hapiware.test.MyAgentDelegate</delegate>
  *		<classpath>
  * 			<entry>/users/me/agent/target/my-delegate-1.0.0.jar</entry>
  *		</classpath>
- *	</agent>
- * </xmp>
+ *	</agent>}
+ * </pre>
  * which sends {@code null} to the
  * {@code MyAgentDelegate.premain(java.util.regex.Pattern[], java.util.regex.Pattern[], Object, Instrumentation)}
  * method as an {@link Object} argument.
@@ -348,7 +343,9 @@ import org.xml.sax.SAXException;
  * text string is delivered to the delegate's
  * {@code static void premain(java.util.regex.Pattern[], java.util.regex.Pattern[], Object, Instrumentation)}
  * method as an {@link Object} argument. For example:
- * <xmp>
+ * <pre>
+ * {@code
+ * 
  * 	<?xml version="1.0" encoding="UTF-8" ?>
  *	<agent>
  *		<delegate>com.hapiware.test.MyAgentDelegate</delegate>
@@ -356,8 +353,8 @@ import org.xml.sax.SAXException;
  * 			<entry>/users/me/agent/target/my-delegate-1.0.0.jar</entry>
  *		</classpath>
  *		<configuration>Show me!</configuration>
- *	</agent>
- * </xmp>
+ *	</agent>}
+ * </pre>
  * which sends "Show me!" to the
  * {@code MyAgentDelegate.premain(java.util.regex.Pattern[], java.util.regex.Pattern[], Object, Instrumentation)}
  * method as an {@link Object} argument.
@@ -368,7 +365,9 @@ import org.xml.sax.SAXException;
  * delegate's
  * {@code static void premain(java.util.regex.Pattern[], java.util.regex.Pattern[], Object, Instrumentation)}
  * method as an {@link Object} argument. For example:
- * <xmp>
+ * <pre>
+ * {@code
+ * 
  * 	<?xml version="1.0" encoding="UTF-8" ?>
  *	<agent>
  *		<delegate>com.hapiware.test.MyAgentDelegate</delegate>
@@ -380,8 +379,8 @@ import org.xml.sax.SAXException;
  *			<item>Two</item>
  *			<item>Three</item>
  *		</configuration>
- *	</agent>
- * </xmp>
+ *	</agent>}
+ * </pre>
  * which sends {@code List<String>} {"One", "Two", "Three"} to the
  * {@code MyAgentDelegate.premain(java.util.regex.Pattern[], java.util.regex.Pattern[], Object, Instrumentation)}
  * method as an {@link Object} argument.
@@ -392,7 +391,8 @@ import org.xml.sax.SAXException;
  * delivered to the agent delegate's
  * {@code static void premain(java.util.regex.Pattern[], java.util.regex.Pattern[], Object, Instrumentation)}
  * method as an {@link Object} argument. For example:
- * <xmp>
+ * <pre>
+ * {@code
  * 	<?xml version="1.0" encoding="UTF-8" ?>
  *	<agent>
  *		<delegate>com.hapiware.test.MyAgentDelegate</delegate>
@@ -404,8 +404,8 @@ import org.xml.sax.SAXException;
  *			<item key="2">Two</item>
  *			<item key="3">Three</item>
  *		</configuration>
- *	</agent>
- * </xmp>
+ *	</agent>}
+ * </pre>
  * which sends {@code Map<String, String>} {{"1", "One"}, {"2", "Two"}, {"3", "Three"}} to the
  * {@code MyAgentDelegate.premain(java.util.regex.Pattern[], java.util.regex.Pattern[], Object, Instrumentation)}
  * method as an {@link Object} argument.
@@ -425,7 +425,8 @@ import org.xml.sax.SAXException;
  * <p>
  * {@code public static Object unmarshall(org.w3c.dom.Element configElement)} is assumed to return
  * a programmer's own configuration object. Here is an example:
- * <xmp>
+ * 
+ * <pre>{@code
  * 	<?xml version="1.0" encoding="UTF-8" ?>
  * 	<agent>
  * 		<delegate>com.hapiware.agent.FancyAgentDelegate</delegate>
@@ -444,8 +445,7 @@ import org.xml.sax.SAXException;
  * 				<date>2010-3-13</date>
  * 			</custom>
  * 		</configuration>
- * 	</agent>
- * </xmp>
+ * 	</agent>}</pre>
  * 
  * This assumes that {@code com.hapiware.asm.FancyAgentDelegate} class has
  * {@code public static Object unmarshall(org.w3c.dom.Element configElement)} method defined

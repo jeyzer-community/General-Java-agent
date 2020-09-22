@@ -8,7 +8,7 @@
 	<groupId>org.jeyzer</groupId>
 	<artifactId>jeyzer-agent</artifactId>
 	<packaging>jar</packaging>
-	<version>3.0</version>
+	<version>3.0-SNAPSHOT</version>
 	<name>Jeyzer Java Agent</name>
 	<url>https://github.com/jeyzer-community/jeyzer-agent</url>
 	<description>

@@ -84,19 +84,6 @@ public class BaseConfigurationTest
 
 		Agent.readDOMDocument(configDoc, this.getClass().toString());
 	}
-
-	
-	@Test(expected=Agent.ConfigurationError.class)
-	public void classPathEntryDoesNotExist()
-	{
-		Element nonExistJar = configDoc.createElement("entry");
-		nonExistJar.appendChild(
-			configDoc.createTextNode("/this/directory_@-6-1-6/does/not/exist/my.jar")
-		);
-		classpath.appendChild(nonExistJar);
-
-		Agent.readDOMDocument(configDoc, this.getClass().toString());
-	}
 	
 	@Test
 	public void readFromFile()

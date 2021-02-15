@@ -1172,11 +1172,11 @@ public class Agent
 			List<URL> classpathsAsURLs = new ArrayList<URL>();
 			for(String classpath : classpaths) {
 				File file = new File(classpath);
-				if(!file.exists())
-					throw
-						new ConfigurationError(
-							"Class path entry \"" + file + "\" does not exist."
-						);
+				// Stay backward compatible : do not throw an exception
+				if(!file.exists()) {
+					System.out.println("WARNING - Agent class path entry is invalid : " + file + " - Please fix the agent classpath configuration.");
+					continue;
+				}
 				classpathsAsURLs.add(file.toURI().toURL());
 			}
 			this.classpaths = Collections.unmodifiableList(classpathsAsURLs);

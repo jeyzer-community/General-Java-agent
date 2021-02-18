@@ -3,6 +3,8 @@ package com.hapiware.agent;
 import static org.junit.Assert.assertEquals;
 
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 
 import javax.xml.parsers.ParserConfigurationException;
 
@@ -40,7 +42,7 @@ public class StringConfigurationTest
 		configuration.appendChild(configDoc.createTextNode("This is text."));
 		
 		ConfigElements configElements =
-			Agent.readDOMDocument(configDoc, this.getClass().toString());
+			Agent.readDOMDocument(configDoc, this.getClass().toString(), new HashMap<String, String>());
 		String value = (String)Agent.unmarshall(this.getClass(), configElements);
 		assertEquals("This is text.", value);
 	}
@@ -49,7 +51,7 @@ public class StringConfigurationTest
 	public void configurationDataIsMissing() throws IOException
 	{
 		ConfigElements configElements =
-			Agent.readDOMDocument(configDoc, this.getClass().toString());
+			Agent.readDOMDocument(configDoc, this.getClass().toString(), new HashMap<String, String>());
 		Agent.unmarshall(this.getClass(), configElements);
 	}
 	
@@ -59,14 +61,16 @@ public class StringConfigurationTest
 		configuration.appendChild(configDoc.createTextNode(""));
 
 		ConfigElements configElements =
-			Agent.readDOMDocument(configDoc, this.getClass().toString());
+			Agent.readDOMDocument(configDoc, this.getClass().toString(), new HashMap<String, String>());
 		Agent.unmarshall(this.getClass(), configElements);
 	}
 	
 	@Test
 	public void readFromFile()
 	{
-		ConfigElements configElements = Agent.readConfigurationFile(FILENAME);
+		Map<String, String> agentParams = new HashMap<>();
+		agentParams.put(Agent.AGENT_CONFIGURATION_PATH, FILENAME);
+		ConfigElements configElements = Agent.readConfigurationFile(agentParams);
 		assertBasicConfiguration(configElements);
 		String str = (String)Agent.unmarshall(null, configElements);
 		assertEquals("Hello World!", str);

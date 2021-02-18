@@ -53,12 +53,14 @@
 				<version>2.6</version>
 				<configuration>
 					<archive>
+						<addMavenDescriptor>false</addMavenDescriptor>
 						<manifestFile>src/main/resources/META-INF/MANIFEST.MF</manifestFile>
+						<manifest>
+							<addDefaultSpecificationEntries>true</addDefaultSpecificationEntries>
+						</manifest>
 						<manifestEntries>
-							<Implementation-Title>${project.build.finalName}</Implementation-Title> 
-							<Implementation-Version>${project.version}</Implementation-Version>
-							<Implementation-Vendor>Jeyzer</Implementation-Vendor>
-						</manifestEntries>
+                        	<Built-By />
+                    	</manifestEntries>
 					</archive>
 				</configuration>
 			</plugin>

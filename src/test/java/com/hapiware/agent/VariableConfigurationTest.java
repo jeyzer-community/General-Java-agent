@@ -3,6 +3,7 @@ package com.hapiware.agent;
 import static org.junit.Assert.assertEquals;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
 
 import javax.xml.parsers.ParserConfigurationException;
@@ -36,9 +37,9 @@ public class VariableConfigurationTest
 	public void normalSituation() throws IOException
 	{
 		final String[][] variableValues = {
-			{ "package", "hapiware" },
-			{ "root", "One"},
-			{ "cat", "miu-mau" }
+			{ "package", "hapiware", null },
+			{ "root", "One", null},
+			{ "cat", "miu-mau", null }
 		};
 		setUpVariables(variableValues);
 
@@ -55,7 +56,7 @@ public class VariableConfigurationTest
 		configuration.appendChild(item);
 		
 		ConfigElements configElements =
-			Agent.readDOMDocument(configDoc, this.getClass().toString());
+			Agent.readDOMDocument(configDoc, this.getClass().toString(), new HashMap<String, String>());
 
 		@SuppressWarnings("unchecked")
 		List<String> list =
@@ -68,11 +69,11 @@ public class VariableConfigurationTest
 	public void combinedVariables()
 	{
 		final String[][] variableValues = {
-			{ "a", "ac" },
-			{ "b", "ag" },
-			{ "p${a}k${b}e", "hapiware" },
-			{ "says", "miu" },
-			{ "cat", "${says}-mau" }
+			{ "a", "ac", null },
+			{ "b", "ag", null },
+			{ "p${a}k${b}e", "hapiware", null },
+			{ "says", "miu", null },
+			{ "cat", "${says}-mau", null }
 		};
 		setUpVariables(variableValues);
 		
@@ -86,7 +87,7 @@ public class VariableConfigurationTest
 		configuration.appendChild(item);
 		
 		ConfigElements configElements =
-			Agent.readDOMDocument(configDoc, this.getClass().toString());
+			Agent.readDOMDocument(configDoc, this.getClass().toString(), new HashMap<String, String>());
 
 		@SuppressWarnings("unchecked")
 		List<String> list =
@@ -98,12 +99,12 @@ public class VariableConfigurationTest
 	public void nestedVariables()
 	{
 		final String[][] variableValues = {
-			{ "a", "seg" },
-			{ "segment", "kag" },
-			{ "pac${${a}ment}e", "hapiware" },
-			{ "b", "ju" },
-			{ "juuri", "roo" },
-			{ "root", "/users/me" }
+			{ "a", "seg", null },
+			{ "segment", "kag", null },
+			{ "pac${${a}ment}e", "hapiware", null },
+			{ "b", "ju", null },
+			{ "juuri", "roo", null },
+			{ "root", "/users/me", null }
 		};
 		setUpVariables(variableValues);
 		
@@ -117,12 +118,38 @@ public class VariableConfigurationTest
 		configuration.appendChild(item);
 		
 		ConfigElements configElements =
-			Agent.readDOMDocument(configDoc, this.getClass().toString());
+			Agent.readDOMDocument(configDoc, this.getClass().toString(), new HashMap<String, String>());
 
 		@SuppressWarnings("unchecked")
 		List<String> list =
 			(List<String>)Agent.unmarshall(this.getClass(), configElements);
 		assertEquals("test-hapiware: [/users/me]", list.get(0));
+	}
+	
+	@Test
+	public void variablesWithDefault()
+	{
+		final String[][] variableValues = {
+			{ "test-variable", "${UNRESOLVED_VARIABLE}", "my_default_value"},
+		};
+		setUpVariables(variableValues);
+		
+		// /agent/configuration
+		configuration = configDoc.createElement("configuration");
+		agent.appendChild(configuration);
+		
+		// /agent/configuration/item
+		Element item = configDoc.createElement("item");
+		item.appendChild(configDoc.createTextNode("test: ${test-variable}"));
+		configuration.appendChild(item);
+		
+		ConfigElements configElements =
+			Agent.readDOMDocument(configDoc, this.getClass().toString(), new HashMap<String, String>());
+
+		@SuppressWarnings("unchecked")
+		List<String> list =
+			(List<String>)Agent.unmarshall(this.getClass(), configElements);
+		assertEquals("test: my_default_value", list.get(0));
 	}
 	
 	@Test(expected=Agent.ConfigurationError.class)
@@ -132,7 +159,7 @@ public class VariableConfigurationTest
 		entry.appendChild(configDoc.createTextNode("user.${miuku}"));
 		classpath.appendChild(entry);
 		
-		Agent.readDOMDocument(configDoc, this.getClass().toString());
+		Agent.readDOMDocument(configDoc, this.getClass().toString(), new HashMap<String, String>());
 	}
 
 	@Test(expected=Agent.ConfigurationError.class)
@@ -147,7 +174,7 @@ public class VariableConfigurationTest
 		item.appendChild(configDoc.createTextNode("Just for testing."));
 		configuration.appendChild(item);
 		
-		Agent.readDOMDocument(configDoc, this.getClass().toString());
+		Agent.readDOMDocument(configDoc, this.getClass().toString(), new HashMap<String, String>());
 	}
 	
 	@Test(expected=Agent.ConfigurationError.class)
@@ -164,7 +191,7 @@ public class VariableConfigurationTest
 		variable.appendChild(configDoc.createTextNode("/users/me"));
 		agent.appendChild(variable);
 		
-		Agent.readDOMDocument(configDoc, this.getClass().toString());
+		Agent.readDOMDocument(configDoc, this.getClass().toString(), new HashMap<String, String>());
 	}
 	
 	
@@ -205,6 +232,7 @@ public class VariableConfigurationTest
 			variables[i] = configDoc.createElement("variable");
 			variables[i].setAttribute("name", variable[0]);
 			variables[i].appendChild(configDoc.createTextNode(variable[1]));
+			variables[i].setAttribute("default", variable[2]);
 			agent.insertBefore(variables[i], delegate);
 			i++;
 		}

@@ -15,21 +15,36 @@ for different agents. And yet one more advantage is that the programmer does not
 about the manifest attributes mentioned java.lang.instrument package description. They are
 already handled for the programmer.
 
+The agent parameter support and the variable default value support permit to instantiate directly the agent, 
+while staying compatible with any environment variable or system property declaration. 
+
 Jeyzer Community is using this agent library in the [Jeyzer Recorder](https://jeyzer.org/jeyzer-recorder/).
 
 Jeyzer extensions include :
 
+- Agent bootstrap logging
+  Boot traces will appear in the console. Disabled by default.
+  Add the -Djeyzer.agent.boot.debug=true on the command line to activate it.
+- Agent parameters support 
+  These parameters can be referenced by the agent variables.
+  Parameters are specified at the end of the Java agent argument, separated by a semicolumn.
+   Example : -javaagent:"<agent jar path>"<jeyzer-agent.xml path>;param_key1=param_value1;param_key2=param_value2[...]
 - System property and environment variable resolution in agent variables 
   Variable syntax is : ${system_property_or_environment_variable_name}
-  Resolution order is performed in this order : internal agent variable, system property, environment variable
+  Resolution order is performed in this order : internal agent variable, agent parameter, system property, environment variable
    Example : <variable name="jeyzer-agent-home">${JEYZER_AGENT_HOME}</variable>
+- Variable default value support. Optional
+  If the system property or environment variable contained in the variable value cannot be resolved, the agent variable will be set with the default value and the unresolved variable will be set as a system property.
+   Example : <variable name="jeyzer-agent-home" default="C:\jeyzer-recordings">${JEYZER_RECORD_APP_RECORDING_HOME}</variable> 
+  System property and environment variable can be specified and will be resolved. Inner variable resolution is however not supported.
+  The end result variable
 - Java 11 support
 - Bug fix : load Sun Apache Xerces schema validator first
 
 
 REQUIREMENTS
 ------------
-- Java 1.6 or later
+- Java 1.7 or later
 
 
 LICENSE
@@ -58,6 +73,6 @@ THE SOFTWARE.
 
 Jeyzer code extensions are under  MPL 2.0 License
 
-Copyright (c) 2020 Jeyzer, https://jeyzer.org
+Copyright (c) 2021 Jeyzer, https://jeyzer.org
 
 Licensed under the [Mozilla Public License, Version 2.0](https://www.mozilla.org/media/MPL/2.0/index.815ca599c9df.txt)

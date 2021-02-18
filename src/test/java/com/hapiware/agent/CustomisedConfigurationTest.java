@@ -5,7 +5,9 @@ import static org.junit.Assert.assertEquals;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.xpath.XPath;
@@ -67,7 +69,7 @@ public class CustomisedConfigurationTest
 	public void normalSituation() throws IOException
 	{
 		ConfigElements configElements =
-			Agent.readDOMDocument(configDoc, this.getClass().toString());
+			Agent.readDOMDocument(configDoc, this.getClass().toString(), new HashMap<String, String>());
 
 		TestConfiguration configuration =
 			(TestConfiguration)Agent.unmarshall(this.getClass(), configElements);
@@ -79,7 +81,9 @@ public class CustomisedConfigurationTest
 	@Test
 	public void readFromFile()
 	{
-		ConfigElements configElements = Agent.readConfigurationFile(FILENAME);
+		Map<String, String> agentParams = new HashMap<>();
+		agentParams.put(Agent.AGENT_CONFIGURATION_PATH, FILENAME);
+		ConfigElements configElements = Agent.readConfigurationFile(agentParams);
 		TestConfiguration configuration =
 			(TestConfiguration)Agent.unmarshall(this.getClass(), configElements);
 		assertEquals("2010-03-13", configuration.getDate());
@@ -90,7 +94,9 @@ public class CustomisedConfigurationTest
 	@Test
 	public void readFromFileHasComments()
 	{
-		ConfigElements configElements = Agent.readConfigurationFile(FILENAME_COMMENTED);
+		Map<String, String> agentParams = new HashMap<>();
+		agentParams.put(Agent.AGENT_CONFIGURATION_PATH, FILENAME_COMMENTED);
+		ConfigElements configElements = Agent.readConfigurationFile(agentParams);
 		TestConfiguration configuration =
 			(TestConfiguration)Agent.unmarshall(this.getClass(), configElements);
 		assertEquals("2010-03-13", configuration.getDate());
@@ -101,7 +107,9 @@ public class CustomisedConfigurationTest
 	@Test(expected = ConfigurationError.class)
 	public void readFromFileHasError()
 	{
-		ConfigElements configElements = Agent.readConfigurationFile(FILENAME_ERRORS);
+		Map<String, String> agentParams = new HashMap<>();
+		agentParams.put(Agent.AGENT_CONFIGURATION_PATH, FILENAME_ERRORS);
+		ConfigElements configElements = Agent.readConfigurationFile(agentParams);
 		Agent.unmarshall(this.getClass(), configElements);
 	}
 

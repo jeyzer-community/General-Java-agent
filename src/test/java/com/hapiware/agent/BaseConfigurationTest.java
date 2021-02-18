@@ -5,6 +5,8 @@ import static org.junit.Assert.assertEquals;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
+import java.util.HashMap;
+import java.util.Map;
 
 import javax.xml.parsers.ParserConfigurationException;
 
@@ -32,7 +34,9 @@ public class BaseConfigurationTest
 	public void normalSituation() throws IOException
 	{
 		File file = createTemporaryConfigDocumentOnDisc(configDoc);
-		ConfigElements configElements = Agent.readConfigurationFile(file.getCanonicalPath());
+		Map<String, String> agentParams = new HashMap<>();
+		agentParams.put(Agent.AGENT_CONFIGURATION_PATH, file.getCanonicalPath());
+		ConfigElements configElements = Agent.readConfigurationFile(agentParams);
 		assertEquals("com.hapiware.agent.AgentTest", configElements.getDelegateAgentName());
 		URL[] agentClasspathUrls = configElements.getClasspaths();
 		assertEquals(new File(".").toURI().toURL(), agentClasspathUrls[0]);
@@ -47,20 +51,24 @@ public class BaseConfigurationTest
 	@Test(expected=Agent.ConfigurationError.class)
 	public void configurationFileDoesNotExist()
 	{
-		Agent.readConfigurationFile("this@F1le-name-does-not-@%½½½-surely-exist");
+		Map<String, String> agentParams = new HashMap<>();
+		agentParams.put(Agent.AGENT_CONFIGURATION_PATH, "this@F1le-name-does-not-@%½½½-surely-exist");
+		Agent.readConfigurationFile(agentParams);
 	}
 	
 	@Test(expected=Agent.ConfigurationError.class)
 	public void configurationFileIsNotDefined()
 	{
-		Agent.readConfigurationFile(null);
+		Map<String, String> agentParams = new HashMap<>();
+		agentParams.put(Agent.AGENT_CONFIGURATION_PATH, null);
+		Agent.readConfigurationFile(agentParams);
 	}
 	
 	@Test
 	public void configurationTagIsMissing()
 	{
 		ConfigElements configElements =
-			Agent.readDOMDocument(configDoc, this.getClass().toString());
+			Agent.readDOMDocument(configDoc, this.getClass().toString(), new HashMap<String, String>());
 		Object obj = Agent.unmarshall(this.getClass(), configElements);
 		assertEquals(null, obj);
 	}
@@ -72,7 +80,7 @@ public class BaseConfigurationTest
 		Element newDelegate = configDoc.createElement("delegate");
 		agent.replaceChild(newDelegate, currentDelegate);
 
-		Agent.readDOMDocument(configDoc, this.getClass().toString());
+		Agent.readDOMDocument(configDoc, this.getClass().toString(), new HashMap<String, String>());
 	}
 
 	@Test(expected=Agent.ConfigurationError.class)
@@ -82,13 +90,15 @@ public class BaseConfigurationTest
 		Element newEntry = configDoc.createElement("entry");
 		classpath.replaceChild(newEntry, currentEntry);
 
-		Agent.readDOMDocument(configDoc, this.getClass().toString());
+		Agent.readDOMDocument(configDoc, this.getClass().toString(), new HashMap<String, String>());
 	}
 	
 	@Test
 	public void readFromFile()
 	{
-		ConfigElements configElements = Agent.readConfigurationFile(FILENAME);
+		Map<String, String> agentParams = new HashMap<>();
+		agentParams.put(Agent.AGENT_CONFIGURATION_PATH, FILENAME);
+		ConfigElements configElements = Agent.readConfigurationFile(agentParams);
 		assertBasicConfiguration(configElements);
 	}
 }

@@ -3,7 +3,9 @@ package com.hapiware.agent;
 import static org.junit.Assert.*;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import javax.xml.parsers.ParserConfigurationException;
 
@@ -11,7 +13,6 @@ import org.junit.Before;
 import org.junit.Test;
 import org.w3c.dom.Element;
 
-import com.hapiware.agent.Agent;
 import com.hapiware.agent.Agent.ConfigElements;
 
 
@@ -49,7 +50,7 @@ public class ListConfigurationTest
 	public void normalSituation() throws IOException
 	{
 		ConfigElements configElements =
-			Agent.readDOMDocument(configDoc, this.getClass().toString());
+			Agent.readDOMDocument(configDoc, this.getClass().toString(), new HashMap<String, String>());
 
 		@SuppressWarnings("unchecked")
 		List<String> list =
@@ -69,14 +70,16 @@ public class ListConfigurationTest
 		configuration.appendChild(item);
 
 		ConfigElements configElements =
-			Agent.readDOMDocument(configDoc, this.getClass().toString());
+			Agent.readDOMDocument(configDoc, this.getClass().toString(), new HashMap<String, String>());
 		Agent.unmarshall(this.getClass(), configElements);
 	}
 	
 	@Test
 	public void readFromFile()
 	{
-		ConfigElements configElements = Agent.readConfigurationFile(FILENAME);
+		Map<String, String> agentParams = new HashMap<>();
+		agentParams.put(Agent.AGENT_CONFIGURATION_PATH, FILENAME);
+		ConfigElements configElements = Agent.readConfigurationFile(agentParams);
 		assertBasicConfiguration(configElements);
 		@SuppressWarnings("unchecked")
 		List<String> list = (List<String>)Agent.unmarshall(null, configElements);

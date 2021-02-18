@@ -10,6 +10,7 @@
 						<xsd:simpleContent>
 							<xsd:extension base="xsd:string">
 								<xsd:attribute name="name" type="text" use="required"/>
+								<xsd:attribute name="default" use="optional"/>
 							</xsd:extension>
 						</xsd:simpleContent>
 					</xsd:complexType>

@@ -3,6 +3,7 @@ package com.hapiware.agent;
 import static org.junit.Assert.assertEquals;
 
 import java.io.IOException;
+import java.util.HashMap;
 
 import javax.xml.parsers.ParserConfigurationException;
 
@@ -42,7 +43,7 @@ public class PatternMatchTest
 	public void normalConfiguration() throws IOException
 	{
 		ConfigElements configElements =
-			Agent.readDOMDocument(configDoc, this.getClass().toString());
+			Agent.readDOMDocument(configDoc, this.getClass().toString(), new HashMap<String, String>());
 		assertEquals(2, configElements.getIncludePatterns().length);
 		assertEquals("^com/hapiware/.+", configElements.getIncludePatterns()[0].toString());
 		assertEquals("^com/mysoft/.+", configElements.getIncludePatterns()[1].toString());
@@ -61,6 +62,6 @@ public class PatternMatchTest
 			element.getParentNode().removeChild(element);
 		}
 
-		Agent.readDOMDocument(configDoc, this.getClass().toString());
+		Agent.readDOMDocument(configDoc, this.getClass().toString(), new HashMap<String, String>());
 	}
 }

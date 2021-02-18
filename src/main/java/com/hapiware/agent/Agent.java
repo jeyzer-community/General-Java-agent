@@ -13,6 +13,9 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.StringTokenizer;
+import java.util.jar.Attributes;
+import java.util.jar.Manifest;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -60,13 +63,13 @@ import org.xml.sax.SAXException;
  * 
  * {@code Agent} is specified by using Java {@code -javaagent} switch like this:
  * <pre>
- *     {@code -javaagent:agent-jarpath=path-to-xml-config-file}
+ *     {@code -javaagent:agent-jarpath=path-to-xml-config-file;arg_key_1=arg_value_1;arg_key_2=arg_value_2[;arg_key_N=arg_value_N]}
  * </pre>
  *
  * For example:
  * <pre>
  * 		{@code
- * 			-javaagent:/users/me/agent/target/agent-1.0.0.jar=/users/me/agent/agent-config.xml
+ * 			-javaagent:/users/me/agent/target/jeyzer-agent.jar=/users/me/agent/agent-config.xml;jeyzer-record-agent-profile=test
  * 		}
  * </pre>
  * 
@@ -137,6 +140,7 @@ import org.xml.sax.SAXException;
  * The variable value can contain variable references which will be resolved in this order :
  * <ul>
  * 		<li>Variable defined previously</li>
+ *  	<li>Agent property</li>
  * 		<li>System property</li>
  * 		<li>Environment variable</li>
  * </ul> 
@@ -463,6 +467,12 @@ import org.xml.sax.SAXException;
  */
 public class Agent
 {
+	static final String AGENT_CONFIGURATION_PATH = "agent-configuration-path";
+	
+	private static final String PROPERTY_JEYZER_AGENT_VERSION = "jzr.agent.version";
+	
+	private static final String VARIABLE_PATTERN = "(\\$\\{([^\\$\\{\\}]+?)\\})";
+	
 	private static final String PREMAIN_SIGNATURE =
 		"static void premain(java.util.regex.Pattern[], java.util.regex.Pattern[], Object, Instrumentation)";
 
@@ -472,8 +482,8 @@ public class Agent
 	private static final String APACHE_XML_SCHEMA_FACTORY =
 			"org.apache.xerces.jaxp.validation.XMLSchemaFactory";
 	
-	public static final String VARIABLE_PREFIX = "${";
-	public static final String VARIABLE_SUFFIX = "}";
+	private static final String VARIABLE_PREFIX = "${";
+	private static final String VARIABLE_SUFFIX = "}";
 	
 	/**
 	 * This method is called before the main method call right after the JVM initialisation. 
@@ -495,7 +505,8 @@ public class Agent
 	 */
 	public static void premain(String agentArgs, Instrumentation instrumentation)
 	{
-		ConfigElements configElements = readConfigurationFile(agentArgs);
+		Map<String, String> agentParams = parseAgentParameters(agentArgs);
+		ConfigElements configElements = readConfigurationFile(agentParams);
 		ClassLoader originalClassLoader = null;
 		try {
 			originalClassLoader = Thread.currentThread().getContextClassLoader();
@@ -510,6 +521,9 @@ public class Agent
 			Class<?> delegateAgentClass =
 				(Class<?>)cl.loadClass(configElements.getDelegateAgentName());
 			Object delegateConfiguration = unmarshall(delegateAgentClass, configElements);
+
+			publishAgentVersion();
+			BootLogger.debug("Agent loaded successfully. Calling now the application delegated premain method.");
 			
 			// Invokes the premain method of the delegate agent.
 			delegateAgentClass.getMethod(
@@ -522,6 +536,8 @@ public class Agent
 				delegateConfiguration,
 				instrumentation
 			);
+			
+			BootLogger.debug("Agent premain ending.");
 		}
 		catch(ClassNotFoundException e) {
 			throw
@@ -565,6 +581,32 @@ public class Agent
 	}
 
 	
+	private static Map<String, String> parseAgentParameters(String agentArgs) {
+		Map<String,String> params = new HashMap<>();	
+		StringTokenizer tokenizer = new StringTokenizer(agentArgs, ";", false);
+		
+		boolean first = true;
+		while (tokenizer.hasMoreTokens()) {
+			 String agentArg = tokenizer.nextToken();
+			 if (first) {
+				 params.put(AGENT_CONFIGURATION_PATH, agentArg);
+				 first = false;
+			 }
+			 else {
+				 int endPos = agentArg.indexOf('=');
+				 if (endPos<=0 || endPos == agentArg.length()-1) {
+					 BootLogger.error("Invalid agent parameter : "  + agentArg + " It must be a key=value pair");
+					 continue;
+				 }
+				 String key = agentArg.substring(0, endPos);
+				 String value = agentArg.substring(endPos+1);
+				 params.put(key, value);				 
+			 }
+	    }
+		
+		return params;
+	}
+
 	/**
 	 * Reads the configuration file and creates the include and exclude regular expression
 	 * pattern compilations for class matching.
@@ -578,19 +620,20 @@ public class Agent
 	 * @throws ConfigurationError
 	 * 		If configuration file cannot be read or parsed properly.
 	 */
-	static ConfigElements readConfigurationFile(String configFileName)
+	static ConfigElements readConfigurationFile(Map<String, String> agentParams)
 	{
-		if(configFileName == null)
+		String agentConfigPath = agentParams.get(AGENT_CONFIGURATION_PATH);
+		if(agentConfigPath == null)
 			throw
 				new ConfigurationError(
 					"The agent configuration file is not defined."
 				);
 		
-		File configFile = new File(configFileName);
+		File configFile = new File(agentConfigPath);
 		if(configFile.exists()) {
 			try {
 				DocumentBuilder builder = DocumentBuilderFactory.newInstance().newDocumentBuilder();
-				return readDOMDocument(builder.parse(configFile), configFile.getCanonicalPath());
+				return readDOMDocument(builder.parse(configFile), configFile.getCanonicalPath(), agentParams);
 			}
 			catch(ParserConfigurationException e) {
 				throw
@@ -630,148 +673,26 @@ public class Agent
 	/**
 	 * This method does the actual work for {@link #readConfigurationFile(String)} method.
 	 * This separation is mainly done for making unit testing easier. 
+	 * @param agentParams 
 	 */
-	static ConfigElements readDOMDocument(Document configDocument, String configFileName)
+	static ConfigElements readDOMDocument(Document configDocument, String configFileName, Map<String, String> agentParams)
 	{
 		ConfigElements retVal = null;
 		try {
 			// Validate configuration document.
-			boolean validate = true;
-			ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
-			SchemaFactory factory = SchemaFactory.newInstance(XMLConstants.W3C_XML_SCHEMA_NS_URI);
+			validateDOMDocument(configDocument);
+
+			Map<String, VariableValue> variables = new HashMap<String, VariableValue>();
 			
-			// Force the Sun Apache Xerces implementation
-			try{
-				factory = SchemaFactory.newInstance(
-						XMLConstants.W3C_XML_SCHEMA_NS_URI, 
-						SUN_XML_SCHEMA_FACTORY,
-						Agent.class.getClassLoader()
-						);
-			}catch(IllegalArgumentException ex){
-				// if JVM is not Sun one
-				System.out.println("Sun Apache schema factory : " + SUN_XML_SCHEMA_FACTORY + " not found. Loading default one.");
-				factory = SchemaFactory.newInstance(XMLConstants.W3C_XML_SCHEMA_NS_URI);
-				System.out.println("Default JVM schema factory is : " + factory.getClass().getName());
-				
-				if (APACHE_XML_SCHEMA_FACTORY.equals(factory.getClass().getName()))
-					// if application comes with its own Apache Xerces library, validation fails with this error :  
-					//   org.xml.sax.SAXParseException; cvc-elt.1.a: Cannot find the declaration of element 'agent'.
-					// Disable therefore the validation
-					validate = false;
-			}
+			loadAgentVariables(configDocument, variables, agentParams);
 			
-			if (validate){
-				Source schemaFile =	new StreamSource(classLoader.getResourceAsStream("agent.xsd"));
-				Schema schema = factory.newSchema(schemaFile);
-				Validator validator = schema.newValidator();
-				validator.validate(new DOMSource(configDocument));
-			}
+			populateAllAttributes(configDocument, variables, agentParams);
 			
+			populateAllData(configDocument, variables, agentParams);
+			
+			instantiateUnresolvedVariables(variables);
+
 			XPath xpath = XPathFactory.newInstance().newXPath();
-			
-			// All /agent/variables.
-			NodeList allVariableEntries = 
-				(NodeList)xpath.evaluate(
-					"/agent/variable",
-					configDocument,
-					XPathConstants.NODESET
-				);
-			
-			// /agent/variable[@name]
-			NodeList variableEntriesWithName = 
-				(NodeList)xpath.evaluate(
-					"/agent/variable[@name]",
-					configDocument,
-					XPathConstants.NODESET
-				);
-			if(allVariableEntries.getLength() != variableEntriesWithName.getLength())
-				throw
-					new ConfigurationError("\"name\" is the only valid attribute for /agent/variable element.");
-			
-			Map<String, String> variables = new HashMap<String, String>();
-			putVariablesWithNamesToMap(variableEntriesWithName, variables);
-			
-			// Replace all variables in attributes in the configuration file.
-			NodeList allAttributes =
-				(NodeList)xpath.evaluate(
-					"/agent//@*",
-					configDocument,
-					XPathConstants.NODESET
-				);
-			Pattern variablePattern = Pattern.compile("(\\$\\{([^\\$\\{\\}]+?)\\})");
-			boolean matched;
-			do {
-				matched = false;
-				for(int i = 0; i < allAttributes.getLength(); i ++) {
-					Node attributeEntry = allAttributes.item(i);
-					String attributeValue = ((Attr)attributeEntry).getValue();
-					Matcher m = variablePattern.matcher(attributeValue);
-					while(m.find()) {
-						matched = true;
-						String substitute = variables.get(m.group(2));
-						if(substitute == null) {
-							String ex =
-								"Attribute \"" + ((Attr)attributeEntry).getOwnerElement().getNodeName() 
-								+ "[@" + attributeEntry.getNodeName() + "]\""
-								+ " has an unrecognised variable " + m.group(1) + ".";
-							throw new ConfigurationError(ex);
-						}
-						attributeValue = attributeValue.replace(m.group(1), substitute);
-						((Attr)attributeEntry).setValue(attributeValue);
-					}
-				}
-			
-				// /agent/variable[@name] must be searched again and put to the map
-				// in the case variables are used in /agent/variable elements as attributes.
-				variableEntriesWithName = 
-					(NodeList)xpath.evaluate(
-						"/agent/variable[@name]",
-						configDocument,
-						XPathConstants.NODESET
-					);
-				putVariablesWithNamesToMap(variableEntriesWithName, variables);
-			} while(matched);
-			
-			// Replace all variables in elements in the configuration file.
-			//  Exclude variable test fields that may reference system properties 
-			//   or system variables
-			NodeList allElements =
-				(NodeList)xpath.evaluate(
-					"/agent//*[not(self::variable)]/text()",
-					configDocument,
-					XPathConstants.NODESET
-				);
-			do {
-				matched = false;
-				for(int i = 0; i < allElements.getLength(); i ++) {
-					Node elementEntry = allElements.item(i);
-					String elementValue = ((Text)elementEntry).getData();
-					Matcher m = variablePattern.matcher(elementValue);
-					while(m.find()) {
-						matched = true;
-						String substitute = variables.get(m.group(2));
-						if(substitute == null) {
-							String ex =
-								"Element \"" + elementEntry.getParentNode().getNodeName() + "\""
-								+ " has an unrecognised variable " + m.group(1) + ".";
-							throw new ConfigurationError(ex);
-						}
-						elementValue = elementValue.replace(m.group(1), substitute);
-						((Text)elementEntry).setData(elementValue);
-					}
-				}
-
-				// /agent/variable[@name] must be searched again and put to the map
-				// in the case variables are used in /agent/variable elements as values.
-				variableEntriesWithName = 
-					(NodeList)xpath.evaluate(
-						"/agent/variable[@name]",
-						configDocument,
-						XPathConstants.NODESET
-					);
-				putVariablesWithNamesToMap(variableEntriesWithName, variables);
-			} while(matched);
-
 			// /agent/delegate
 			String delegateAgent =
 				(String)xpath.evaluate("/agent/delegate", configDocument, XPathConstants.STRING);
@@ -840,7 +761,7 @@ public class Agent
 		catch(SAXException e) {
 			throw
 				new ConfigurationError(
-					"Validting the agent configuration file \""
+					"Validating the agent configuration file \""
 						+ configFileName + "\" didn't succeed.\n"
 						+ "\t->" + e.getMessage(),
 					e
@@ -867,7 +788,196 @@ public class Agent
 	}
 
 	
-	private static void putVariablesWithNamesToMap(NodeList variableEntries, Map<String, String> map)
+	private static void instantiateUnresolvedVariables(Map<String, VariableValue> variables) {
+		// Instantiate as system properties the unresolved variables
+		Pattern variablePattern = Pattern.compile(VARIABLE_PATTERN);
+		for (String key : variables.keySet()) {
+			String value = variables.get(key).getValue();
+			String defaultValue = variables.get(key).getDefaultValue();
+			Matcher m = variablePattern.matcher(value);
+			while(m.find()) {
+				String variableName = m.group(2);
+				if (System.getenv().get(variableName) == null && System.getProperty(variableName) == null){
+					// Set it as system property
+					BootLogger.debug("Agent variable " + key + " is referencing an unresolved variable. Set it as system property " + variableName + " with the default value : " + defaultValue);
+					System.setProperty(variableName, defaultValue);
+					break; // do it only once					
+				}
+			}
+		}
+	}
+
+
+	private static void populateAllData(Document configDocument, Map<String, VariableValue> variables, Map<String, String> agentParams) throws XPathExpressionException {
+		XPath xpath = XPathFactory.newInstance().newXPath();
+		
+		// Replace all variables in elements in the configuration file.
+		//  Exclude variable test fields that may reference system properties 
+		//   or system variables
+		NodeList allElements =
+			(NodeList)xpath.evaluate(
+				"/agent//*[not(self::variable)]/text()",
+				configDocument,
+				XPathConstants.NODESET
+			);
+		
+		boolean matched;
+		do {
+			matched = false;
+			for(int i = 0; i < allElements.getLength(); i ++) {
+				Node elementEntry = allElements.item(i);
+				String elementValue = ((Text)elementEntry).getData();
+				Pattern variablePattern = Pattern.compile(VARIABLE_PATTERN);
+				Matcher m = variablePattern.matcher(elementValue);
+				while(m.find()) {
+					matched = true;
+					VariableValue substituteValue = variables.get(m.group(2));
+					if (substituteValue == null) {
+						String ex =
+								"Element \"" + elementEntry.getParentNode().getNodeName() + "\""
+								+ " has an unrecognised variable " + m.group(1);
+							throw new ConfigurationError(ex);							
+					}
+					String substitute = substituteValue.getValue();
+					if(substitute.trim().startsWith("${")) {  // unresolved variable
+						// Take default value if any
+						if (substituteValue.hasDefaultValue()) {
+							BootLogger.debug("Taking the default value for the " + m.group(1) + " unresolved agent variable. Agent variable value is now : " + substituteValue.getDefaultValue());
+							substitute = substituteValue.getDefaultValue();
+						}
+						else {
+							String ex =
+									"Element \"" + elementEntry.getParentNode().getNodeName() + "\""
+									+ " has an unrecognised variable " + m.group(1) + " and does not have any default value.";
+								throw new ConfigurationError(ex);
+						}
+					}
+					elementValue = elementValue.replace(m.group(1), substitute);
+					((Text)elementEntry).setData(elementValue);
+				}
+			}
+
+			// /agent/variable[@name] must be searched again and put to the map
+			// in the case variables are used in /agent/variable elements as values.
+			NodeList variableEntriesWithName = 
+				(NodeList)xpath.evaluate(
+					"/agent/variable[@name]",
+					configDocument,
+					XPathConstants.NODESET
+				);
+			putVariablesWithNamesToMap(variableEntriesWithName, variables, agentParams);
+		} while(matched);
+	}
+
+
+	private static void populateAllAttributes(Document configDocument, Map<String, VariableValue> variables, Map<String, String> agentParams) throws XPathExpressionException {
+		XPath xpath = XPathFactory.newInstance().newXPath();
+		
+		// Replace all variables in attributes in the configuration file.
+		NodeList allAttributes =
+			(NodeList)xpath.evaluate(
+				"/agent//@*",
+				configDocument,
+				XPathConstants.NODESET
+			);
+		Pattern variablePattern = Pattern.compile(VARIABLE_PATTERN);
+		boolean matched;
+		do {
+			matched = false;
+			for(int i = 0; i < allAttributes.getLength(); i ++) {
+				Node attributeEntry = allAttributes.item(i);
+				String attributeValue = ((Attr)attributeEntry).getValue();
+				Matcher m = variablePattern.matcher(attributeValue);
+				while(m.find()) {
+					matched = true;
+					VariableValue substituteValue = variables.get(m.group(2));
+					if(substituteValue == null) {
+						String ex =
+							"Attribute \"" + ((Attr)attributeEntry).getOwnerElement().getNodeName() 
+							+ "[@" + attributeEntry.getNodeName() + "]\""
+							+ " has an unrecognised variable " + m.group(1) + ".";
+						throw new ConfigurationError(ex);
+					}
+					String substitute = variables.get(m.group(2)).getValue();
+					attributeValue = attributeValue.replace(m.group(1), substitute);
+					((Attr)attributeEntry).setValue(attributeValue);
+				}
+			}
+		
+			// /agent/variable[@name] must be searched again and put to the map
+			// in the case variables are used in /agent/variable elements as attributes.
+			NodeList variableEntriesWithName = 
+				(NodeList)xpath.evaluate(
+					"/agent/variable[@name]",
+					configDocument,
+					XPathConstants.NODESET
+				);
+			putVariablesWithNamesToMap(variableEntriesWithName, variables, agentParams);
+		} while(matched);
+
+	}
+
+
+	private static void loadAgentVariables(Document configDocument, Map<String, VariableValue> variables, Map<String, String> agentParams) throws XPathExpressionException {
+		XPath xpath = XPathFactory.newInstance().newXPath();
+		
+		// All /agent/variables.
+		NodeList allVariableEntries = 
+			(NodeList)xpath.evaluate(
+				"/agent/variable",
+				configDocument,
+				XPathConstants.NODESET
+			);
+		
+		// /agent/variable[@name]
+		NodeList variableEntriesWithName = 
+			(NodeList)xpath.evaluate(
+				"/agent/variable[@name]",
+				configDocument,
+				XPathConstants.NODESET
+			);
+		if(allVariableEntries.getLength() != variableEntriesWithName.getLength())
+			throw
+				new ConfigurationError("\"name\" attribute is mandatory on the /agent/variable element.");
+		
+		putVariablesWithNamesToMap(variableEntriesWithName, variables, agentParams);
+	}
+
+
+	private static void validateDOMDocument(Document configDocument) throws SAXException, IOException {
+		boolean validate = true;
+		ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+		SchemaFactory factory = SchemaFactory.newInstance(XMLConstants.W3C_XML_SCHEMA_NS_URI);
+		
+		// Force the Sun Apache Xerces implementation
+		try{
+			factory = SchemaFactory.newInstance(
+					XMLConstants.W3C_XML_SCHEMA_NS_URI, 
+					SUN_XML_SCHEMA_FACTORY,
+					Agent.class.getClassLoader()
+					);
+		}catch(IllegalArgumentException ex){
+			// if JVM is not Sun one
+			BootLogger.debug("Sun Apache schema factory : " + SUN_XML_SCHEMA_FACTORY + " not found. Loading default one.");
+			factory = SchemaFactory.newInstance(XMLConstants.W3C_XML_SCHEMA_NS_URI);
+			BootLogger.debug("Default JVM schema factory is : " + factory.getClass().getName());
+			
+			if (APACHE_XML_SCHEMA_FACTORY.equals(factory.getClass().getName()))
+				// if application comes with its own Apache Xerces library, validation fails with this error :  
+				//   org.xml.sax.SAXParseException; cvc-elt.1.a: Cannot find the declaration of element 'agent'.
+				// Disable therefore the validation
+				validate = false;
+		}
+		
+		if (validate){
+			Source schemaFile =	new StreamSource(classLoader.getResourceAsStream("agent.xsd"));
+			Schema schema = factory.newSchema(schemaFile);
+			Validator validator = schema.newValidator();
+			validator.validate(new DOMSource(configDocument));
+		}
+	}
+
+	private static void putVariablesWithNamesToMap(NodeList variableEntries, Map<String, VariableValue> map, Map<String, String> agentParams)
 	{
 		map.clear();
 		for(int i = 0; i < variableEntries.getLength(); i++) {
@@ -875,8 +985,14 @@ public class Agent
 			Node variableValue = variableEntry.getFirstChild();
 			NamedNodeMap nameAttributes = variableEntry.getAttributes();
 			Node nameAttribute = nameAttributes.getNamedItem("name");
-			String value = resolveValue(((Text)variableValue).getData(), map);
-			map.put(nameAttribute.getNodeValue(), value);
+			String value = resolveValue(((Text)variableValue).getData(), map, agentParams);
+			Node defaultAttribute = nameAttributes.getNamedItem("default");
+			String defaultValue = null;
+			if (defaultAttribute != null && defaultAttribute.getNodeValue() != null) {
+				defaultValue = resolveValue((defaultAttribute.getNodeValue()), map, agentParams);
+				defaultAttribute.setNodeValue(defaultValue); // update the default attribute value
+			}
+			map.put(nameAttribute.getNodeValue(), new VariableValue(value, defaultValue));
 		}
 	}
 	
@@ -884,8 +1000,9 @@ public class Agent
 	/**
 	 * Resolves the variables ${VARIABLE} if present, 
 	 * looking first for previous agent variable, second system property, third for environment variable.
+	 * @param agentParams 
 	 */
-	private static String resolveValue(String value, Map<String, String> map){
+	private static String resolveValue(String value, Map<String, VariableValue> map, Map<String, String> agentParams){
 		StringBuilder resolvedValue = new StringBuilder(10);
 		int end = 0;
 		int pos = 0;
@@ -904,7 +1021,7 @@ public class Agent
 					return resolvedValue.toString();
 				}
 				else{
-					resolvedValue.append(resolveVariable(value.substring(pos, end+1), map));
+					resolvedValue.append(resolveVariable(value.substring(pos, end+1), map, agentParams));
 				}
 				
 				prev = end +1;
@@ -923,8 +1040,9 @@ public class Agent
 	/**
 	 * Resolves the variables ${VARIABLE} if present, 
 	 * looking first for previous agent variable, second system property, third for environment variable.
+	 * @param agentParams 
 	 */
-	private static String resolveVariable(String value, Map<String, String> map){
+	private static String resolveVariable(String value, Map<String, VariableValue> map, Map<String, String> agentParams){
 
 		if (value !=null && value.startsWith(VARIABLE_PREFIX) && value.endsWith(VARIABLE_SUFFIX)){
 			String variable = value.substring(2, value.length()-1);
@@ -934,26 +1052,40 @@ public class Agent
 			if (variable.length()==0)
 				return value;
 
-			resolvedValue = map.get(variable);
-			if (resolvedValue != null)
-				return resolveInnerVariable(resolvedValue, value, map);
+			if (map.get(variable) != null) {
+				resolvedValue = map.get(variable).getValue();
+				if (resolvedValue != null) {
+					BootLogger.debug("Variable " + variable + " is resolved through inner variable. Resulting value is : " + resolvedValue);
+					return resolveInnerVariable(resolvedValue, value, map, agentParams);				
+				}
+			}
+			
+			resolvedValue = agentParams.get(variable);
+			if (resolvedValue != null) {
+				BootLogger.debug("Variable " + variable + " is resolved through agent parameter. Resulting value is : " + resolvedValue);
+				return resolveInnerVariable(resolvedValue, value, map, agentParams);
+			}
 			
 			resolvedValue = System.getProperty(variable);
-			if (resolvedValue != null)
-				return resolveInnerVariable(resolvedValue, value, map);
+			if (resolvedValue != null) {
+				BootLogger.debug("Variable " + variable + " is resolved through system property. Resulting value is : " + resolvedValue);
+				return resolveInnerVariable(resolvedValue, value, map, agentParams);
+			}
 			
 			resolvedValue = System.getenv(variable);
-			if (resolvedValue != null)
-				return resolveInnerVariable(resolvedValue, value, map);
+			if (resolvedValue != null) {
+				BootLogger.debug("Variable " + variable + " is resolved through environment variable. Resulting value is : " + resolvedValue);
+				return resolveInnerVariable(resolvedValue, value, map, agentParams);
+			}
 		}
 		
 		return value;
 	}
 	
-	private static String resolveInnerVariable(String resolvedValue, String originalValue, Map<String, String> map){
+	private static String resolveInnerVariable(String resolvedValue, String originalValue, Map<String, VariableValue> map, Map<String, String> agentParams){
 		String result = resolvedValue;
 		if (resolvedValue.contains(VARIABLE_PREFIX)){
-			result = resolveValue(resolvedValue, map);
+			result = resolveValue(resolvedValue, map, agentParams);
 		}
 		return result;
 	}
@@ -1127,8 +1259,6 @@ public class Agent
 					String key = keyNode == null ? "" : keyNode.getNodeValue();
 					if(item != null)
 						map.put(key, ((Text)item.getFirstChild()).getData());
-					else
-						map.put(key, "");
 				}
 				retVal = map;
 			}
@@ -1140,7 +1270,31 @@ public class Agent
 		assert retVal != null;
 		return retVal;
 	}
-
+	
+	public static void publishAgentVersion() {
+		try {
+			Class<Agent> clazz = Agent.class;
+			String className = clazz.getSimpleName() + ".class";
+			String classPath = clazz.getResource(className).toString();
+			if (!classPath.startsWith("jar"))
+				// Class not loaded from JAR
+				return;
+			
+			String manifestPath = classPath.substring(0,
+					classPath.lastIndexOf('!') + 1)
+					+ "/META-INF/MANIFEST.MF";
+			Manifest manifest = new Manifest(new URL(manifestPath).openStream());
+			Attributes attr = manifest.getMainAttributes();
+			String value = attr.getValue("Specification-Version");
+			if (value == null)
+				// Class loaded from JAR within war file
+				return;
+			
+			System.setProperty(PROPERTY_JEYZER_AGENT_VERSION, value);
+		} catch (IOException ex) {
+			BootLogger.warning("Failed to access the Agent version from its Manifest file : " + ex.getMessage());
+		}
+	}
 
 	/**
 	 * {@code ConfigElements} is data object for collecting all the necessary items from
@@ -1174,7 +1328,7 @@ public class Agent
 				File file = new File(classpath);
 				// Stay backward compatible : do not throw an exception
 				if(!file.exists()) {
-					System.out.println("WARNING - Agent class path entry is invalid : " + file + " - Please fix the agent classpath configuration.");
+					BootLogger.warning("Agent class path entry is invalid : " + file + " - Please fix the agent classpath configuration.");
 					continue;
 				}
 				classpathsAsURLs.add(file.toURI().toURL());
@@ -1245,6 +1399,39 @@ public class Agent
 		public ConfigurationError(Throwable cause)
 		{
 			super(cause);
+		}
+	}
+	
+	/**
+	 * A variable value container with a default value (if the original value cannot be resolved itself through variables). 
+	 *
+	 * @author jeyzer
+	 *
+	 */
+	static class VariableValue
+	{
+		private String value;        // can be unresolved
+		private String defaultValue; // can be null
+		
+		public VariableValue(String value, String defaultValue)
+		{
+			this.value = value;
+			this.defaultValue = defaultValue;
+		}
+
+		public String getValue()
+		{
+			return this.value;
+		}
+		
+		public String getDefaultValue()
+		{
+			return this.defaultValue;
+		}
+
+		public boolean hasDefaultValue()
+		{
+			return this.defaultValue != null;
 		}
 	}
 }

@@ -4,7 +4,7 @@
 	<groupId>org.jeyzer</groupId>
 	<artifactId>jeyzer-agent</artifactId>
 	<packaging>jar</packaging>
-	<version>3.1</version>
+	<version>3.2-SNAPSHOT</version>
 	<name>Jeyzer Java Agent</name>
 	<url>https://github.com/jeyzer-community/jeyzer-agent</url>
 	<description>
@@ -138,7 +138,7 @@
 		<url>https://github.com/jeyzer-community/jeyzer-agent</url>
 		<connection>scm:git:ssh://git@github.com/jeyzer-community/jeyzer-agent.git</connection>
 		<developerConnection>scm:git:ssh://git@github.com/jeyzer-community/jeyzer-agent.git</developerConnection>
-		<tag>jeyzer-agent-3.1</tag>
+		<tag>HEAD</tag>
 	</scm>
 	
 	<distributionManagement>
